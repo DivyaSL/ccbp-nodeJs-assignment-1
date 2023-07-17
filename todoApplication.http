@@ -1,7 +1,7 @@
 GET http://localhost:3000/todos/?priority=HIGH&status=DONE
 ### 
 
-GET http://localhost:3000/todos/5/
+GET http://localhost:3000/todos/1/
 ###
 
 GET http://localhost:3000/agenda/?date=2021-12-12
@@ -18,3 +18,9 @@ Content-Type: application/json
  "category": "HOME",
  "dueDate": "2021-02-22"
 }
+### 
+
+PUT http://localhost:3000/todos/1/
+Content-Type: application/json
+
+{ "status": "DONE" }
