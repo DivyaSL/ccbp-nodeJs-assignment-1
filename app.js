@@ -248,13 +248,31 @@ app.get("/todos/:todoId", async (request, response) => {
 });
 
 //API 3
-app.get("/agenda/", (request, response) => {
+app.get("/agenda/", async (request, response) => {
   const { date } = request.query;
-  const formattedDate = format(new Date(date), "yyyy-MM-dd");
-  const isValidDate = (formattedDate) => {
-    return isValid(toDate(formattedDate));
-  };
-  console.log(isValidDate);
+  if (date === undefined) {
+    response.status(400);
+    response.send("Invalid Due Date");
+  } else {
+    const isValidDate = isValid(new Date(date));
+    if (isValidDate) {
+      const formattedDate = format(new Date(date), "yyyy-MM-dd");
+      const getTodoByDateQuery = `
+            SELECT
+                *
+            FROM
+                todo
+            WHERE
+                due_date = '${formattedDate}';`;
+      const data = await db.all(getTodoByDateQuery);
+      response.send(
+        data.map((eachTodo) => convertDbObjectToResponseObject(eachTodo))
+      );
+    } else {
+      response.status(400);
+      response.send("Invalid Due Date");
+    }
+  }
 });
 
 //API 4
@@ -275,10 +293,7 @@ app.post("/todos/", async (request, response) => {
     );
   };
   const hasValidDueDate = (requestBody) => {
-    if (requestBody.dueDate !== undefined) {
-      const formattedDate = format(requestBody.dueDate, "yyyy-MM-dd");
-      return isValid(formattedDate, "yyyy-MM-dd");
-    }
+    return requestBody.dueDate !== undefined && isValid(new Date(dueDate));
   };
 
   if (!hasValidStatus(request.body)) {
@@ -294,11 +309,12 @@ app.post("/todos/", async (request, response) => {
     response.status(400);
     response.send("Invalid Due Date");
   } else {
+    const formattedDate = format(new Date(date), "yyyy-MM-dd");
     const addTodoQuery = `
         INSERT INTO 
             todo (id, todo, priority, status, category, due_date)
         VALUES 
-            (${id}, '${todo}', '${priority}', '${status}', '${category}', '${dueDate}');
+            (${id}, '${todo}', '${priority}', '${status}', '${category}', '${formattedDate}');
         `;
     await db.run(addTodoQuery);
     response.send("Todo Successfully Added");
@@ -396,16 +412,23 @@ app.put("/todos/:todoId/", async (request, response) => {
       break;
 
     case hasDueDate(request.body):
-      updateTodoQuery = `
+      if (isValid(new Date(dueDate))) {
+        const formattedDate = format(new Date(dueDate), "yyyy-MM-dd");
+        updateTodoQuery = `
                 UPDATE 
                     todo 
                 SET 
-                    due_date = '${dueDate}'
+                    due_date = '${formattedDate}'
                 WHERE 
                     id = ${todoId};`;
 
-      await db.run(updateTodoQuery);
-      response.send("Due Date Updated");
+        await db.run(updateTodoQuery);
+        response.send("Due Date Updated");
+        return;
+      } else {
+        response.status(400);
+        response.send("Invalid Due Date");
+      }
       break;
   }
 });
@@ -414,9 +437,7 @@ app.put("/todos/:todoId/", async (request, response) => {
 app.delete("/todos/:todoId/", async (request, response) => {
   const { todoId } = request.params;
   const deleteTodoQuery = `
-        SELECT 
-            * 
-        FROM 
+        DELETE FROM 
             todo 
         WHERE   
             id = ${todoId}`;
